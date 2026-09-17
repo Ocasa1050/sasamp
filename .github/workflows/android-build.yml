@@ -1,0 +1,155 @@
+name: Android build
+
+on:
+  push:
+    branches:
+      - main
+      - "replit/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build dependencies
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "cmake;3.22.1" \
+            "ndk;28.0.13004108"
+
+      - name: Check case-sensitive C/C++ includes
+        shell: python
+        run: |
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          root = Path(".").resolve()
+          files = []
+          for directory, _, names in os.walk(root):
+              if "/.git/" in directory.replace("\\", "/"):
+                  continue
+              for name in names:
+                  files.append((Path(directory) / name).resolve())
+
+          normalized = {}
+          for path in files:
+              relative = path.relative_to(root).as_posix()
+              normalized.setdefault(relative.lower(), []).append(relative)
+
+          include_pattern = re.compile(r'^\s*#\s*include\s*"([^"]+)"')
+          errors = []
+          extensions = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
+
+          for source in files:
+              if source.suffix.lower() not in extensions:
+                  continue
+              try:
+                  lines = source.read_text(encoding="utf-8", errors="ignore").splitlines()
+              except OSError:
+                  continue
+              source_relative = source.relative_to(root).as_posix()
+              for line_number, line in enumerate(lines, 1):
+                  match = include_pattern.match(line)
+                  if not match:
+                      continue
+                  include = match.group(1)
+                  exact = (source.parent / include).resolve()
+                  if exact.is_file():
+                      continue
+                  suffix = include.lower().lstrip("./")
+                  matches = [
+                      candidate
+                      for key, values in normalized.items()
+                      if key.endswith(suffix)
+                      for candidate in values
+                  ]
+                  if len(matches) == 1:
+                      errors.append(
+                          f"{source_relative}:{line_number}: "
+                          f"{include} -> {matches[0]}"
+                      )
+
+          if errors:
+              print("Case-sensitive include errors found:")
+              print("\n".join(errors))
+              sys.exit(1)
+          print("All local quoted includes match Linux paths.")
+
+      - name: Provide CI-only Google services metadata
+        run: |
+          if [ ! -f app/google-services.json ]; then
+            cat > app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "ci-placeholder",
+              "storage_bucket": "ci-placeholder.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.russia.game"
+                  }
+                },
+                "api_key": [
+                  {
+                    "current_key": "CI_ONLY"
+                  }
+                ]
+              },
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:1111111111111111",
+                  "android_client_info": {
+                    "package_name": "com.russia.game.test"
+                  }
+                },
+                "api_key": [
+                  {
+                    "current_key": "CI_ONLY"
+                  }
+                ]
+              }
+            ]
+          }
+          JSON
+          fi
+
+      - name: Build debug APKs
+        run: ./gradlew --no-daemon --stacktrace assembleVer_testDebug assembleVer_releaseDebug
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sasamp-debug-apks
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error

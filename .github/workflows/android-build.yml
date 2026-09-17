@@ -45,31 +45,36 @@ jobs:
       - name: Check case-sensitive C/C++ includes
         shell: python
         run: |
-          import os
           import re
           import sys
           from pathlib import Path
 
           root = Path(".").resolve()
-          files = []
-          for directory, _, names in os.walk(root):
-              if "/.git/" in directory.replace("\\", "/"):
-                  continue
-              for name in names:
-                  files.append((Path(directory) / name).resolve())
+          cpp_root = root / "app" / "src" / "main" / "cpp"
+          extensions = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
+          source_files = [
+              path for path in cpp_root.rglob("*")
+              if path.is_file() and path.suffix.lower() in extensions
+          ]
 
-          normalized = {}
-          for path in files:
-              relative = path.relative_to(root).as_posix()
-              normalized.setdefault(relative.lower(), []).append(relative)
+          # CMake adds several include directories. Index every directory below
+          # the native source root so includes such as net/netgame.h are checked
+          # against the same search space used by the native build.
+          include_roots = [path for path in cpp_root.rglob("*") if path.is_dir()]
+          include_roots.append(cpp_root)
+          indices = {}
+          for include_root in include_roots:
+              index = {}
+              for candidate in include_root.rglob("*"):
+                  if candidate.is_file():
+                      relative = candidate.relative_to(include_root).as_posix()
+                      index.setdefault(relative.casefold(), []).append(candidate)
+              indices[include_root] = index
 
           include_pattern = re.compile(r'^\s*#\s*include\s*"([^"]+)"')
           errors = []
-          extensions = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
 
-          for source in files:
-              if source.suffix.lower() not in extensions:
-                  continue
+          for source in source_files:
               try:
                   lines = source.read_text(encoding="utf-8", errors="ignore").splitlines()
               except OSError:
@@ -83,17 +88,23 @@ jobs:
                   exact = (source.parent / include).resolve()
                   if exact.is_file():
                       continue
-                  suffix = include.lower().lstrip("./")
-                  matches = [
-                      candidate
-                      for key, values in normalized.items()
-                      if key.endswith(suffix)
-                      for candidate in values
-                  ]
+                  if any(
+                      (include_root / include).is_file()
+                      for include_root in include_roots
+                  ):
+                      continue
+
+                  matches = set()
+                  for include_root in include_roots:
+                      for candidate in indices[include_root].get(
+                          Path(include).as_posix().casefold(), []
+                      ):
+                          matches.add(candidate.relative_to(root).as_posix())
+
                   if len(matches) == 1:
                       errors.append(
                           f"{source_relative}:{line_number}: "
-                          f"{include} -> {matches[0]}"
+                          f"{include} -> {next(iter(matches))}"
                       )
 
           if errors:

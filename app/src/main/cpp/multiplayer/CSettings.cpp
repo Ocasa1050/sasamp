@@ -17,6 +17,19 @@ static void ClearBackslashN(char *pStr, size_t size) {
 	}
 }
 
+static void CopySetting(char *destination, size_t destinationSize, const char *value) {
+if (destinationSize == 0) {
+return;
+}
+
+if (value == nullptr) {
+destination[0] = '\0';
+return;
+}
+
+snprintf(destination, destinationSize, "%s", value);
+}
+
 void CSettings::toDefaults(int iCategory)
 {
 	char buff[0x7F];
@@ -117,11 +130,12 @@ void CSettings::LoadSettings(const char *szNickName, int iChatLines)
 
 	memset(m_Settings.szIp, 0, sizeof(m_Settings.szIp));
 	const char *szIp = ini_table_get_entry(config, "client", "ip");
-	strcpy(m_Settings.szIp, szIp);
+CopySetting(m_Settings.szIp, sizeof(m_Settings.szIp), szIp);
 
 	m_Settings.port = ini_table_get_entry_as_int(config, "client", "port", 7777);
 
-	std::string szName = ini_table_get_entry(config, "client", "name");
+const char *szNameValue = ini_table_get_entry(config, "client", "name");
+std::string szName = szNameValue != nullptr ? szNameValue : "";
 	const char *szPassword = ini_table_get_entry(config, "client", "password");
 	const char *pPassword = ini_table_get_entry(config, "client", "player_password");
 
@@ -137,23 +151,24 @@ void CSettings::LoadSettings(const char *szNickName, int iChatLines)
 	m_Settings.isTestMode = ini_table_get_entry_as_int(config, "client", "test", 0);
 	g_bIsTestMode = (bool)m_Settings.isTestMode;
 
-	std::string szFontName = ini_table_get_entry(config, "gui", "Font");
+const char *szFontValue = ini_table_get_entry(config, "gui", "Font");
+std::string szFontName = szFontValue != nullptr ? szFontValue : "";
 
 	if(pPassword)
 	{
-		strcpy(m_Settings.player_password, pPassword);
+CopySetting(m_Settings.player_password, sizeof(m_Settings.player_password), pPassword);
 	}
 	if ( !szName.empty() )
 	{
-		strcpy(m_Settings.szNickName, szName.c_str());
+CopySetting(m_Settings.szNickName, sizeof(m_Settings.szNickName), szName.c_str());
 	}
 	if (szPassword)
 	{
-		strcpy(m_Settings.szPassword, szPassword);
+CopySetting(m_Settings.szPassword, sizeof(m_Settings.szPassword), szPassword);
 	}
 	if ( !szFontName.empty() )
 	{
-		strcpy(m_Settings.szFont, szFontName.c_str());
+CopySetting(m_Settings.szFont, sizeof(m_Settings.szFont), szFontName.c_str());
 	}
 
 	ClearBackslashN(m_Settings.szNickName, sizeof(m_Settings.szNickName));

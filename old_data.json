@@ -1,0 +1,17 @@
+{
+  "news": [],
+  "servers": [
+    {
+      "color": "#FFFFFF",
+      "lock": 0,
+      "serverID": "0",
+      "mult": "94.23.168.153:2144",
+      "name": "Server 1",
+      "online": 0,
+      "maxonline": 1200,
+      "port": 2144,
+      "ip": "94.23.168.153",
+      "onlinePer30Min": 0
+    }
+  ]
+}

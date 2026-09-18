@@ -4,6 +4,9 @@ import com.russia.launcher.NetworkService;
 
 public class Config {
     public static final String APK_FILE_NAME = "russia.apk";
+    // The APK is distributed manually for this build; do not replace the
+    // installed client automatically with the server's release APK.
+    public static final boolean AUTO_APK_UPDATE_ENABLED = false;
 
     public static final String ZIP_FILES_BASE_ADR = NetworkService.FILES_BASE_ADR + "zip/";
     public static final String FILE_INFO_URL = NetworkService.FILES_BASE_ADR + "files.php";

@@ -25,6 +25,7 @@ import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 import static com.russia.launcher.config.Config.LIVE_RUSSIA_RESOURCE_SERVER_URL;
+import static com.russia.launcher.config.Config.AUTO_APK_UPDATE_ENABLED;
 
 public class PolicyActivity extends AppCompatActivity {
 
@@ -99,6 +100,11 @@ public class PolicyActivity extends AppCompatActivity {
 
 
     private void checkVersionAndStartLauncher() {
+        if (!AUTO_APK_UPDATE_ENABLED) {
+            startLauncher();
+            return;
+        }
+
         Call<LatestVersionInfoDto> latestVersionInfoCall = sNetworkService.getLatestVersionInfoDto();
 
         latestVersionInfoCall.enqueue(new Callback<LatestVersionInfoDto>() {

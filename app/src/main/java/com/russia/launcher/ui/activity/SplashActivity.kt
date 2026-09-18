@@ -190,6 +190,12 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private fun checkVersion() {
+        if (!Config.AUTO_APK_UPDATE_ENABLED) {
+            apkVersionChecked = true
+            startIfReady()
+            return
+        }
+
         val latestVersionInfoCall = networkService?.latestVersionInfoDto
         latestVersionInfoCall?.enqueue(object : Callback<LatestVersionInfoDto?> {
             override fun onResponse(call: Call<LatestVersionInfoDto?>, response: Response<LatestVersionInfoDto?>) {

@@ -34,13 +34,15 @@ object ServersList {
                 if (response.isSuccessful) {
                     val monitoringData = response.body()
 
-                    news = monitoringData?.news!!
-                    servers = monitoringData.servers
+                    if (monitoringData != null) {
+                        news = monitoringData.news
+                        servers = monitoringData.servers
 
-                    saveToFile(activity, monitoringData)
+                        saveToFile(activity, monitoringData)
 
-                    listener.monitoringDataLoadedSuccess()
-                    return
+                        listener.monitoringDataLoadedSuccess()
+                        return
+                    }
                 }
                 loadFromFile(activity, listener)
             }
@@ -78,6 +80,9 @@ object ServersList {
             listener.monitoringDataLoadedSuccess()
         } catch (ex: Exception) {
             ex.printStackTrace()
+            news = emptyList()
+            servers = emptyList()
+            listener.monitoringDataLoadedSuccess()
         }
     }
 }

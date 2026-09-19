@@ -120,22 +120,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onClickPlay() {
-        startGame()
-        /*if (isCheckSkipping) {
+        if (isCheckSkipping) {
             startGame()
-        } else {
-            val progressDialog = findViewById<ConstraintLayout>(R.id.progressDialog)
-            progressDialog.visibility = View.VISIBLE
+            return
+        }
 
-            GlobalScope.launch {
-                val filesList = CacheChecker.getInvalidFilesList(this@MainActivity)
-                withContext(Dispatchers.Main) {
+        val progressDialog = findViewById<ConstraintLayout>(R.id.progressDialog)
+        progressDialog.visibility = View.VISIBLE
+
+        GlobalScope.launch(Dispatchers.IO) {
+            val filesList = if (CacheChecker.hasFilesList(this@MainActivity)) {
+                CacheChecker.getInvalidFilesList(this@MainActivity)
+            } else {
+                null
+            }
+
+            withContext(Dispatchers.Main) {
+                progressDialog.visibility = View.GONE
+                if (filesList == null) {
+                    ActivityServiceImpl.showErrorMessage(
+                        "Не удалось загрузить список файлов игры. Проверьте соединение и повторите попытку.",
+                        this@MainActivity
+                    )
+                } else {
                     doAfterCacheChecked(filesList)
-
-                    progressDialog.visibility = View.GONE
                 }
             }
-        }*/
+        }
     }
 
     private val isCheckSkipping: Boolean

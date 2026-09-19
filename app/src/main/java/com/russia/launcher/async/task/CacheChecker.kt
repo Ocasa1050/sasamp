@@ -70,7 +70,17 @@ object CacheChecker {
 
     @JvmStatic
     fun isGameCacheValid(activity: Activity): Boolean {
-        return getInvalidFilesList(activity).isEmpty()
+        return hasFilesList(activity) && getInvalidFilesList(activity).isEmpty()
+    }
+
+    @JvmStatic
+    fun hasFilesList(context: Context): Boolean {
+        val cacheFile = File(context.filesDir, CACHE_FILE_NAME)
+        if (!cacheFile.isFile || cacheFile.length() == 0L) {
+            return false
+        }
+
+        return getFilesList(context).files.isNotEmpty()
     }
 
     @JvmStatic

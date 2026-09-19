@@ -18,7 +18,9 @@ public class Config {
     public static final String URL_RE_CAPTCHA = "https://files.russia.online/reCaptcha.html";
     private static final String URL_DONATE = "https://russia.online/donate_v2/confirm.php?server=%s&serverName=%s&sum=%s&account=%s&mail=%s&captcha=%s";
 
-    public static final String LIVE_RUSSIA_RESOURCE_SERVER_URL = "https://files.russia.online";
+    // Retrofit requires a trailing slash. The old files.russia.online host is
+    // retired; use the active resource host for the launcher requests.
+    public static final String LIVE_RUSSIA_RESOURCE_SERVER_URL = "https://files.liverussia.online/";
     public static final String FORUM_URL = "https://forum.russia.online";
     public static final String DONATE_URL = "https://russia.online/donate/";
 

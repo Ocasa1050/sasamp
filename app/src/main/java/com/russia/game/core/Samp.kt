@@ -23,6 +23,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.russia.game.R
 import com.russia.game.gui.hud.HudManager
+import com.russia.launcher.config.Config
 import com.russia.launcher.async.task.CacheChecker.isGameCacheValid
 import java.io.File
 import java.io.IOException
@@ -220,6 +221,11 @@ class Samp : GTASA() {
 
         @JvmStatic
         private fun requestGameFilesCheck() {
+            if (!Config.AUTO_GAME_FILES_CHECK_ENABLED) {
+                activity.runOnUiThread { gameFilesChecked(true) }
+                return
+            }
+
             Thread {
                 if (isGameCacheValid(activity)) {
                     activity.runOnUiThread { gameFilesChecked(true) }

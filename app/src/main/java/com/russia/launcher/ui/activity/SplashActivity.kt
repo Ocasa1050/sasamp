@@ -189,7 +189,9 @@ class SplashActivity : AppCompatActivity() {
     }
 
     fun startIfReady() {
-        if (permissionsGranded && apkVersionChecked && filesListLoaded && monitoringDataLoaded && animationEnded/*&& gpuDetected*/) {
+        // Microphone permission is requested in parallel and must not block the
+        // launcher. A denial should never leave the splash screen stuck.
+        if (apkVersionChecked && filesListLoaded && monitoringDataLoaded && animationEnded/*&& gpuDetected*/) {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
         }

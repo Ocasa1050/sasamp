@@ -17,7 +17,7 @@ public interface NetworkService {
     String APK_URL = "https://files.liverussia.online/apk/test/app-ver_test-release.apk";
 
     @Headers("Content-Type: application/json")
-    @GET("https://api.liverussia.online/old_data_test.php")
+    @GET("https://raw.githubusercontent.com/Ocasa1050/sasamp/replit/fix-cache-and-server-json/old_data.json")
     Call<MonitoringData> getMonitoringData();
 
     @Headers("Content-Type: application/json")

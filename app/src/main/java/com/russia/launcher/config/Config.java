@@ -7,6 +7,10 @@ public class Config {
     // The APK is distributed manually for this build; do not replace the
     // installed client automatically with the server's release APK.
     public static final boolean AUTO_APK_UPDATE_ENABLED = false;
+    // Temporarily skip the remote game-file manifest and cache validation.
+    // This lets an installed client enter the selected server without
+    // depending on the retired file-list/download service.
+    public static final boolean AUTO_GAME_FILES_CHECK_ENABLED = false;
 
     public static final String ZIP_FILES_BASE_ADR = NetworkService.FILES_BASE_ADR + "zip/";
     public static final String FILE_INFO_URL = NetworkService.FILES_BASE_ADR + "files.php";

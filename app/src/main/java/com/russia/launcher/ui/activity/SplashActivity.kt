@@ -129,6 +129,12 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private fun loadFilesList() {
+        if (!Config.AUTO_GAME_FILES_CHECK_ENABLED) {
+            filesListLoaded = true
+            startIfReady()
+            return
+        }
+
         val call = networkService.filesList
 
         call?.enqueue(object : Callback<GameFileInfoDto> {

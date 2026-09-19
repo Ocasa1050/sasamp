@@ -1,0 +1,1 @@
+- [Android build environment](android-build-environment.md) — Gradle verification needs both a Java runtime and an Android SDK configured in the workspace.

@@ -97,7 +97,7 @@ void CVoicePlugin::MainLoop()
     while(auto controlPacket = Network::ReceiveControlPacket())
     {
         CVoicePlugin::ControlPacketHandler(controlPacket);
-        delete controlPacket->data;
+        delete[] controlPacket->data;
         delete controlPacket;
     }
 

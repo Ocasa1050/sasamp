@@ -69,6 +69,7 @@ void Network::Free() noexcept
 
     while (!controlQueue.empty()){
         auto packet = controlQueue.front();
+        delete[] packet->data;
         delete packet;
 
         std::lock_guard<std::mutex> lock(controlQueueMutex);
@@ -303,26 +304,51 @@ bool Network::OnRaknetRpc(const int id, RakNet::BitStream& parameters) noexcept
 
 bool Network::OnRaknetReceive(Packet* packet) noexcept
 {
-//    if(*packet->data != kRaknetPacketId)
-//        return true;
-    auto controlPacketPtr = new ControlPacket();
+    constexpr uint32_t controlHeaderSize =
+        sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint16_t);
+
+    if (packet == nullptr || packet->data == nullptr ||
+        packet->length < controlHeaderSize ||
+        static_cast<uint8_t>(packet->data[0]) != kRaknetPacketId) {
+        return false;
+    }
+
+    auto controlPacketPtr = new ControlPacket {};
+    const auto destroyControlPacket = [&]() noexcept {
+        delete[] controlPacketPtr->data;
+        delete controlPacketPtr;
+    };
 
     RakNet::BitStream bs((unsigned char*)packet->data, packet->length, false);
     bs.IgnoreBits(8); // skip packet and rpc id
-    bs.Read(controlPacketPtr->packet);
-    bs.Read(controlPacketPtr->length);
-    controlPacketPtr->data = new uint8_t[controlPacketPtr->length];
-    bs.Read(reinterpret_cast<char *>(controlPacketPtr->data), controlPacketPtr->length);
+    if (!bs.Read(controlPacketPtr->packet) ||
+        !bs.Read(controlPacketPtr->length) ||
+        controlPacketPtr->length > packet->length - controlHeaderSize) {
+        destroyControlPacket();
+        return false;
+    }
 
-  //  memcpy(controlPacketPtr, packet->data, sizeof(ControlPacket));
-    //controlPacketPtr = reinterpret_cast<ControlPacket*>(packet->data + sizeof(uint8_t));
+    controlPacketPtr->data = controlPacketPtr->length == 0
+        ? nullptr
+        : new uint8_t[controlPacketPtr->length];
+    if (controlPacketPtr->length != 0 &&
+        !bs.Read(reinterpret_cast<char *>(controlPacketPtr->data),
+                 controlPacketPtr->length)) {
+        destroyControlPacket();
+        return false;
+    }
 
     switch(controlPacketPtr->packet)
     {
         case SV::ControlPacketType::serverInfo:
         {
-            const auto& stData = *reinterpret_cast<SV::ServerInfoPacket*>(controlPacketPtr->data);
-            if(controlPacketPtr->length != sizeof(stData)) return false;
+            if (controlPacketPtr->length != sizeof(SV::ServerInfoPacket)) {
+                destroyControlPacket();
+                return false;
+            }
+
+            const auto& stData =
+                *reinterpret_cast<SV::ServerInfoPacket*>(controlPacketPtr->data);
 
             Log("[sv:dbg:network:serverInfo] : connecting to voiceserver "
                 "'*.*.*.*:%hu'...", Network::serverIp.c_str(), stData.serverPort);
@@ -337,6 +363,7 @@ bool Network::OnRaknetReceive(Packet* packet) noexcept
                         sizeof(serverAddress)) == SOCKET_ERROR)
             {
                 Log("[sv:err:network:serverInfo] : connect error.");
+                destroyControlPacket();
                 return false;
             }
 
@@ -354,11 +381,17 @@ bool Network::OnRaknetReceive(Packet* packet) noexcept
 
             Network::voiceThread = std::thread(Network::VoiceThread);
         }
+        destroyControlPacket();
         break;
         case SV::ControlPacketType::pluginInit:
         {
-            const auto& stData = *reinterpret_cast<SV::PluginInitPacket*>(controlPacketPtr->data);
-            if(controlPacketPtr->length != sizeof(stData)) return false;
+            if (controlPacketPtr->length != sizeof(SV::PluginInitPacket)) {
+                destroyControlPacket();
+                return false;
+            }
+
+            const auto& stData =
+                *reinterpret_cast<SV::PluginInitPacket*>(controlPacketPtr->data);
 
             Log("[sv:dbg:network:pluginInit] : plugin init packet "
                 "(bitrate:%u;mute:%hhu)", stData.bitrate, stData.mute);
@@ -371,6 +404,7 @@ bool Network::OnRaknetReceive(Packet* packet) noexcept
 
             Network::connectionStatus = ConnectionStatus::Connected;
         }
+        destroyControlPacket();
         break;
         default:
         {

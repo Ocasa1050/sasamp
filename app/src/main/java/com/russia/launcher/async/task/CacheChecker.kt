@@ -29,14 +29,26 @@ object CacheChecker {
     private const val CACHE_FILE_NAME = "last_files.dat"
 
     fun setFilesList(context: Context, gameFileInfoDto: GameFileInfoDto) {
+        val preferredTextureExtension = MainUtils.preferredTextureExtension
+        val hasPreferredTexture = preferredTextureExtension?.let { extension ->
+            gameFileInfoDto.files.any { it.path.lowercase().contains(extension) }
+        } == true
+        val textureExtensionsToRemove = if (hasPreferredTexture) {
+            MainUtils.usselesTex
+        } else {
+            // Do not remove the only available texture format when the cache
+            // does not publish the format selected by this GPU.
+            emptyList()
+        }
         val iterator = gameFileInfoDto.files.iterator()
 
         while (iterator.hasNext()) {
             val file = iterator.next()
-            for (ext in MainUtils.usselesTex) {
-                if (file.path.contains(ext)) {
+            for (ext in textureExtensionsToRemove) {
+                if (file.path.lowercase().contains(ext)) {
                     println("Удаление файла: ${file.path}")
                     iterator.remove() // Удаляем файл из списка
+                    break
                 }
             }
         }

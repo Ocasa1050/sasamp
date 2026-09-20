@@ -8,9 +8,11 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
+import android.opengl.GLSurfaceView
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -32,6 +34,8 @@ import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
@@ -42,7 +46,8 @@ class SplashActivity : AppCompatActivity() {
     private var monitoringDataLoaded = false
     private var filesListLoaded = false
     private var animationEnded = false
-    // var gpuDetected             = false
+    private var gpuDetected = false
+    private var gpuSurfaceView: GLSurfaceView? = null
 
     private val REQUEST_ID = 228
     private val permissionList = arrayOf(
@@ -122,10 +127,40 @@ class SplashActivity : AppCompatActivity() {
             }
         )
 
-        loadFilesList()
+        initializeGpuCheck()
         checkVersion()
         checkPermissions()
 
+    }
+
+    private fun initializeGpuCheck() {
+        val surfaceView = GLSurfaceView(this)
+        surfaceView.layoutParams = ViewGroup.LayoutParams(1, 1)
+        surfaceView.setRenderer(object : GLSurfaceView.Renderer {
+            override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+                if (gpuDetected) {
+                    return
+                }
+
+                val extensions = gl?.glGetString(GL10.GL_EXTENSIONS).orEmpty()
+                MainUtils.configureTextureSupport(extensions)
+                gpuDetected = true
+
+                runOnUiThread {
+                    binding.activitySplash.removeView(surfaceView)
+                    gpuSurfaceView = null
+                    loadFilesList()
+                    startIfReady()
+                }
+            }
+
+            override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) = Unit
+
+            override fun onDrawFrame(gl: GL10?) = Unit
+        })
+
+        binding.activitySplash.addView(surfaceView)
+        gpuSurfaceView = surfaceView
     }
 
     private fun loadFilesList() {
@@ -183,7 +218,13 @@ class SplashActivity : AppCompatActivity() {
     }
 
     fun startIfReady() {
-        if (permissionsGranded && apkVersionChecked && filesListLoaded && monitoringDataLoaded && animationEnded/*&& gpuDetected*/) {
+        if (permissionsGranded &&
+            apkVersionChecked &&
+            filesListLoaded &&
+            monitoringDataLoaded &&
+            animationEnded &&
+            gpuDetected
+        ) {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
         }
@@ -237,44 +278,10 @@ class SplashActivity : AppCompatActivity() {
         }
 
     public override fun onDestroy() {
+        gpuSurfaceView?.onPause()
+        gpuSurfaceView?.let { binding.activitySplash.removeView(it) }
+        gpuSurfaceView = null
         super.onDestroy()
     }
 
 }
-
-//class GpuInfoActivity(activity: SplashActivity) {
-//
-//    private var mGlSurfaceView: GLSurfaceView? = null
-//    private val mGlRenderer: Renderer = object : Renderer {
-//        override fun onSurfaceCreated(gl: GL10?, config: javax.microedition.khronos.egl.EGLConfig?) {
-//            MainUtils.usselesTex.remove(".dxt")
-////            val glExtensions = gl?.glGetString(GL10.GL_EXTENSIONS)
-////            if (glExtensions!!.contains("GL_IMG_texture_compression_pvrtc")) {
-////                MainUtils.usselesTex.remove(".pvr")
-////            } else if (glExtensions.contains("GL_EXT_texture_compression_dxt1") || glExtensions.contains("GL_EXT_texture_compression_s3tc") || glExtensions.contains("GL_AMD_compressed_ATC_texture")) {
-////                MainUtils.usselesTex.remove(".dxt")
-////            } else {
-////                MainUtils.usselesTex.remove(".etc")
-////            }
-////
-//            activity.gpuDetected = true
-//            activity.startIfReady()
-//        }
-//
-//        override fun onSurfaceChanged(gl: GL10, width: Int, height: Int) {
-//            // TODO Auto-generated method stub
-//        }
-//
-//        override fun onDrawFrame(gl: GL10) {
-//            // TODO Auto-generated method stub
-//        }
-//    }
-//
-//    init {
-//        mGlSurfaceView = GLSurfaceView(activity)
-//        mGlSurfaceView!!.setRenderer(mGlRenderer)
-//        activity.findViewById<FrameLayout>(R.id.activitySplash).addView(mGlSurfaceView)
-//        mGlSurfaceView!!.layoutParams.width = 1
-//        mGlSurfaceView!!.layoutParams.height = 1
-//    }
-//}

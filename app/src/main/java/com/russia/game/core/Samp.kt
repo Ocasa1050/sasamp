@@ -41,6 +41,7 @@ class Samp : GTASA() {
     override fun onCreate(bundle: Bundle?) {
 
         activity = this
+        initializeLogFile()
 
         val display = Companion.windowManager.defaultDisplay
         maxFps = display.refreshRate
@@ -53,6 +54,17 @@ class Samp : GTASA() {
         super.onCreate(bundle)
         init()
     }
+
+    private fun initializeLogFile() {
+        try {
+            val logFile = File(getExternalFilesDir(null), "log.txt")
+            logFile.parentFile?.mkdirs()
+            logFile.appendText("Samp.onCreate: starting native client\n")
+        } catch (e: Exception) {
+            Log.e("Samp", "Unable to initialize log file", e)
+        }
+    }
+
     private fun clearDir(dir: File) {
         try {
             if (dir.exists()) {

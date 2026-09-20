@@ -9,7 +9,7 @@ public class Config {
     public static final boolean AUTO_APK_UPDATE_ENABLED = false;
 
     public static final String ZIP_FILES_BASE_ADR = NetworkService.FILES_BASE_ADR + "zip/";
-    public static final String FILE_INFO_URL = NetworkService.FILES_BASE_ADR + "files.php";
+    public static final String FILE_INFO_URL = NetworkService.FILE_INFO_URL;
 
     public static final String URL_RE_CAPTCHA = "https://files.russia.online/reCaptcha.html";
     private static final String URL_DONATE = "https://russia.online/donate_v2/confirm.php?server=%s&serverName=%s&sum=%s&account=%s&mail=%s&captcha=%s";

@@ -3,7 +3,6 @@ package com.russia.launcher.download
 import com.russia.launcher.NetworkService
 import com.russia.launcher.async.dto.response.FileInfo
 import com.russia.launcher.config.Config.APK_FILE_NAME
-import com.russia.launcher.config.Config.ZIP_FILES_BASE_ADR
 import com.russia.launcher.ui.activity.LoaderActivity
 import com.russia.launcher.utils.BytesTo
 import kotlinx.coroutines.Dispatchers
@@ -13,9 +12,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
+import java.net.HttpURLConnection
 import java.net.URL
-import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
+import java.util.zip.Adler32
 
 interface DownloadListener {
     fun onDownloadComplete()
@@ -67,49 +68,78 @@ class FileDownloader(
 
     private fun downloadFile(from: String, to: String) {
         val url = URL(from)
-        val connection = url.openConnection()
-
-        val inputStream = connection.getInputStream()
-        val outputFile = File(to)
-
-        // Создаем все необходимые родительские директории
-        outputFile.parentFile?.mkdirs()
-
-        val outputStream = FileOutputStream(outputFile)
-        val buffer = ByteArray(1024)
-        var bytesRead: Int
-        var percentDownloaded = 0
-
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-            outputStream.write(buffer, 0, bytesRead)
-
-            totalDownloadedSize += bytesRead.toLong() // Обновляем общий размер загруженных данных
-
-            percentDownloaded = (totalDownloadedSize.toDouble() / totalFilesSize * 100).toInt() // Вычисляем общий процент завершения
-
-            val currentTime = System.currentTimeMillis()
-            val time = currentTime - lastTime
-            if(time >= 1000) {
-                curSpeed = totalDownloadedSize - lastDonwloaded
-                lastDonwloaded = totalDownloadedSize
-                lastTime = currentTime
-            }
-
-            val text = String.format("%s из %s (%s / сек.)",
-                BytesTo.convert(totalDownloadedSize),
-                BytesTo.convert(totalFilesSize),
-                BytesTo.convert(curSpeed)
-            )
-
-            loaderActivity.updateProgress(percentDownloaded, outputFile.name, text)
+        if (url.protocol != "https") {
+            throw IOException("Only HTTPS downloads are allowed")
         }
 
-        inputStream.close()
-        outputStream.close()
+        val connection = url.openConnection() as? HttpURLConnection
+            ?: throw IOException("Unsupported download connection")
+        connection.connectTimeout = 30_000
+        connection.readTimeout = 30_000
+        connection.instanceFollowRedirects = true
+
+        val outputFile = File(to)
+        outputFile.parentFile?.mkdirs()
+        val partialFile = File("$to.part")
+
+        try {
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) {
+                throw IOException("Download failed with HTTP $responseCode: $from")
+            }
+
+            connection.inputStream.use { inputStream ->
+                FileOutputStream(partialFile).use { outputStream ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        outputStream.write(buffer, 0, bytesRead)
+
+                        totalDownloadedSize += bytesRead.toLong()
+
+                        val percentDownloaded = if (totalFilesSize > 0) {
+                            (totalDownloadedSize.toDouble() / totalFilesSize * 100)
+                                .toInt()
+                                .coerceAtMost(100)
+                        } else {
+                            0
+                        }
+
+                        val currentTime = System.currentTimeMillis()
+                        val time = currentTime - lastTime
+                        if (time >= 1000) {
+                            curSpeed = totalDownloadedSize - lastDonwloaded
+                            lastDonwloaded = totalDownloadedSize
+                            lastTime = currentTime
+                        }
+
+                        val text = String.format(
+                            "%s из %s (%s / сек.)",
+                            BytesTo.convert(totalDownloadedSize),
+                            BytesTo.convert(totalFilesSize),
+                            BytesTo.convert(curSpeed)
+                        )
+
+                        loaderActivity.updateProgress(percentDownloaded, outputFile.name, text)
+                    }
+                }
+            }
+
+            if (outputFile.exists() && !outputFile.delete()) {
+                throw IOException("Unable to replace existing file: $to")
+            }
+            if (!partialFile.renameTo(outputFile)) {
+                throw IOException("Unable to finalize downloaded file: $to")
+            }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     fun downloadAndInstallFile() {
         totalFilesSize = filesList.sumOf { it.size }
+        totalDownloadedSize = 0
         GlobalScope.launch(Dispatchers.Default) {
             try {
                 downloadFile(
@@ -124,60 +154,92 @@ class FileDownloader(
                 }
             }
             catch (e: Exception) {
-                downloadListener?.onDownloadFailed()
+                withContext(Dispatchers.Main) {
+                    downloadListener?.onDownloadFailed()
+                }
             }
         }
     }
 
     private suspend fun downloadAndUnzipFile(fileInfo: FileInfo) = withContext(Dispatchers.IO) {
+        val externalFilesDir = loaderActivity.getExternalFilesDir(null)
+            ?: throw IOException("External files directory is unavailable")
+        val downloadUrl = fileInfo.url.trim()
+        if (downloadUrl.isEmpty()) {
+            throw IOException("No download URL for ${fileInfo.path}")
+        }
+
+        val zipFile = File(externalFilesDir, "${fileInfo.path}.zip")
+        val targetFile = File(externalFilesDir, fileInfo.path)
 
         downloadFile(
-            ZIP_FILES_BASE_ADR + fileInfo.path + ".zip",
-            loaderActivity.getExternalFilesDir(null).toString() + "/" + fileInfo.path + ".zip"
+            downloadUrl,
+            zipFile.path
         )
         println("Скачали файл ${fileInfo.path}")
-        unzipFile(
-            loaderActivity.getExternalFilesDir(null).toString() + "/" + fileInfo.path + ".zip",
-            loaderActivity.getExternalFilesDir(null).toString() + "/" + fileInfo.path
-        )
+        unzipFile(zipFile, targetFile)
 
+        if (!isFileValid(targetFile, fileInfo)) {
+            targetFile.delete()
+            throw IOException("Downloaded file failed validation: ${fileInfo.path}")
+        }
+        zipFile.delete()
     }
 
-    private fun unzipFile(from: String, to: String) {
-        val zipFile = File(from)
-        val unzipFile = File(to)
+    private fun unzipFile(zipFile: File, targetFile: File) {
+        val partialTarget = File("${targetFile.path}.part")
+        partialTarget.delete()
+        targetFile.parentFile?.mkdirs()
 
-        val zipInputStream = ZipInputStream(FileInputStream(zipFile))
-        var zipEntry: ZipEntry? = zipInputStream.nextEntry
-
-        //
         loaderActivity.runOnUiThread {
             loaderActivity.speedText?.text = "Распаковка ..."
         }
 
-        while (zipEntry != null) {
-            val entryParentDir = unzipFile.parentFile
-
+        ZipInputStream(FileInputStream(zipFile)).use { zipInputStream ->
+            val zipEntry = zipInputStream.nextEntry
+                ?: throw IOException("Downloaded archive is empty")
             if (zipEntry.isDirectory) {
-                unzipFile.mkdirs()
-            } else {
-                entryParentDir?.mkdirs()
-                val outputStream = FileOutputStream(unzipFile)
+                throw IOException("Downloaded archive contains a directory instead of a file")
+            }
+
+            FileOutputStream(partialTarget).use { outputStream ->
                 val buffer = ByteArray(1024)
                 var bytesRead: Int
                 while (zipInputStream.read(buffer).also { bytesRead = it } != -1) {
                     outputStream.write(buffer, 0, bytesRead)
                 }
-                outputStream.close()
             }
+
             zipInputStream.closeEntry()
-            zipEntry = zipInputStream.nextEntry
+            if (zipInputStream.nextEntry != null) {
+                throw IOException("Downloaded archive contains more than one file")
+            }
         }
 
-        zipInputStream.close()
-        zipFile.delete()
+        if (targetFile.exists() && !targetFile.delete()) {
+            throw IOException("Unable to replace existing file: ${targetFile.path}")
+        }
+        if (!partialTarget.renameTo(targetFile)) {
+            throw IOException("Unable to finalize extracted file: ${targetFile.path}")
+        }
 
-        println("Распаковка завершена: ${from}")
+        println("Распаковка завершена: ${zipFile.path}")
+    }
+
+    private fun isFileValid(file: File, expected: FileInfo): Boolean {
+        if (!file.isFile || file.length() != expected.size) {
+            return false
+        }
+
+        val adler32 = Adler32()
+        FileInputStream(file).use { inputStream ->
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                adler32.update(buffer, 0, bytesRead)
+            }
+        }
+        return adler32.value == expected.hash
     }
 
 }

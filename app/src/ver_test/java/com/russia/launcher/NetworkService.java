@@ -1,7 +1,5 @@
 package com.russia.launcher;
 
-import static com.russia.launcher.config.Config.FILE_INFO_URL;
-
 import com.russia.launcher.async.dto.response.GameFileInfoDto;
 import com.russia.launcher.async.dto.response.LatestVersionInfoDto;
 import com.russia.launcher.async.dto.response.LoaderSliderInfoResponseDto;
@@ -14,6 +12,7 @@ import retrofit2.http.Headers;
 public interface NetworkService {
 
     String FILES_BASE_ADR = "https://files.liverussia.online/gamecache_test/";
+    String FILE_INFO_URL = "https://raw.githubusercontent.com/Ocasa1050/sasamp-game-cache/main/test/files.json";
     String APK_URL = "https://files.liverussia.online/apk/test/app-ver_test-release.apk";
 
     @Headers("Content-Type: application/json")
@@ -21,7 +20,7 @@ public interface NetworkService {
     Call<MonitoringData> getMonitoringData();
 
     @Headers("Content-Type: application/json")
-    @GET(FILE_INFO_URL)
+    @GET(NetworkService.FILE_INFO_URL)
     Call<GameFileInfoDto> getFilesList();
 
     @Headers("Content-Type: application/json")

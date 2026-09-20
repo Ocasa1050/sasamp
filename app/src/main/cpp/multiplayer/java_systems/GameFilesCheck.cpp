@@ -3,6 +3,7 @@
 //
 
 #include "GameFilesCheck.h"
+#include <jni.h>
 #include "raknet/BitStream.h"
 #include "net/netgame.h"
 

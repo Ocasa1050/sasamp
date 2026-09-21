@@ -2,6 +2,7 @@ package com.russia.launcher.async.task
 
 import android.app.Activity
 import android.content.Context
+import android.util.Log
 import com.russia.launcher.async.dto.response.FileInfo
 import com.russia.launcher.async.dto.response.GameFileInfoDto
 import com.russia.launcher.utils.MainUtils
@@ -29,29 +30,30 @@ object CacheChecker {
     private const val CACHE_FILE_NAME = "last_files.dat"
 
     fun setFilesList(context: Context, gameFileInfoDto: GameFileInfoDto) {
-        val preferredTextureExtension = MainUtils.preferredTextureExtension
-        val hasPreferredTexture = preferredTextureExtension?.let { extension ->
-            gameFileInfoDto.files.any { it.path.lowercase().contains(extension) }
-        } == true
-        val textureExtensionsToRemove = if (hasPreferredTexture) {
-            MainUtils.usselesTex
-        } else {
-            // Do not remove the only available texture format when the cache
-            // does not publish the format selected by this GPU.
-            emptyList()
-        }
+        val selectedTextureExtension = MainUtils.selectAvailableTextureExtension(
+            gameFileInfoDto.files
+        )
+        val textureExtensionsToRemove = MainUtils.usselesTex
         val iterator = gameFileInfoDto.files.iterator()
 
         while (iterator.hasNext()) {
             val file = iterator.next()
             for (ext in textureExtensionsToRemove) {
-                if (file.path.lowercase().contains(ext)) {
+                if (MainUtils.textureFormat(file) == ext) {
                     println("Удаление файла: ${file.path}")
                     iterator.remove() // Удаляем файл из списка
                     break
                 }
             }
         }
+
+        Log.i(
+            "TextureSupport",
+            "Texture cache selection: selected=$selectedTextureExtension " +
+                "remaining=${gameFileInfoDto.files.count { MainUtils.textureFormat(it) == \".dxt\" }} DXT, " +
+                "${gameFileInfoDto.files.count { MainUtils.textureFormat(it) == \".etc\" }} ETC, " +
+                "${gameFileInfoDto.files.count { MainUtils.textureFormat(it) == \".pvr\" }} PVR"
+        )
 
         try {
             val fileOutputStream = context.openFileOutput(CACHE_FILE_NAME, Context.MODE_PRIVATE)

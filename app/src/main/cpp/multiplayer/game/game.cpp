@@ -458,13 +458,16 @@ bool CGame::InitialiseRenderWare() {
 	CVisibilityPlugins::Initialise();
 
 #if VER_SAMP
-    TextureDatabaseRuntime::Load("mobile", false, TextureDatabaseFormat::DF_Default);
-    TextureDatabaseRuntime::Load("txd", false, TextureDatabaseFormat::DF_Default);
-    TextureDatabaseRuntime::Load("gta3", false, TextureDatabaseFormat::DF_Default);
-    TextureDatabaseRuntime::Load("gta_int", false, TextureDatabaseFormat::DF_Default);
-    TextureDatabaseRuntime::Load("cutscene", false, TextureDatabaseFormat::DF_Default);
-    TextureDatabaseRuntime::Load("player", false, TextureDatabaseFormat::DF_PVR);
-    TextureDatabaseRuntime::Load("menu", false, TextureDatabaseFormat::DF_PVR);
+    const auto textureFormat = TextureDatabaseRuntime::GetPreferredTextureDatabaseFormat();
+    DLOG("Initialising SAMP texture databases with format=%s",
+         GetTextureDatabaseFormatName(textureFormat));
+    TextureDatabaseRuntime::Load("mobile", false, textureFormat);
+    TextureDatabaseRuntime::Load("txd", false, textureFormat);
+    TextureDatabaseRuntime::Load("gta3", false, textureFormat);
+    TextureDatabaseRuntime::Load("gta_int", false, textureFormat);
+    TextureDatabaseRuntime::Load("cutscene", false, textureFormat);
+    TextureDatabaseRuntime::Load("player", false, textureFormat);
+    TextureDatabaseRuntime::Load("menu", false, textureFormat);
 #else
 	TextureDatabaseRuntime::Load("samp", false, TextureDatabaseFormat::DF_DXT);
 	TextureDatabaseRuntime::Load("gui", false, TextureDatabaseFormat::DF_DXT);

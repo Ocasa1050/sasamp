@@ -3,17 +3,61 @@
 //
 
 #include "TextureDatabaseRuntime.h"
+#include "../../main.h"
 #include "util/patch.h"
+
+namespace {
+TextureDatabaseFormat gPreferredTextureDatabaseFormat = TextureDatabaseFormat::DF_Default;
+}
+
+void SetPreferredTextureDatabaseFormat(TextureDatabaseFormat format) {
+    gPreferredTextureDatabaseFormat = format;
+    Log("Texture database format selected: %s", GetTextureDatabaseFormatName(format));
+}
+
+TextureDatabaseFormat GetPreferredTextureDatabaseFormat() {
+    return gPreferredTextureDatabaseFormat;
+}
+
+const char* GetTextureDatabaseFormatName(TextureDatabaseFormat format) {
+    switch (format) {
+        case TextureDatabaseFormat::DF_DXT:
+            return "DXT";
+        case TextureDatabaseFormat::DF_ETC:
+            return "ETC";
+        case TextureDatabaseFormat::DF_PVR:
+            return "PVR";
+        case TextureDatabaseFormat::DF_Default:
+            return "Default";
+        default:
+            return "Unknown";
+    }
+}
 
 TextureDatabaseRuntime* TextureDatabaseRuntime::Load(const char *withName, bool fullyLoad, TextureDatabaseFormat forcedFormat)
 {
-    return CHook::CallFunction<TextureDatabaseRuntime*>(g_libGTASA + (VER_x32 ? 0x001EA864 + 1 : 0x28771C), withName, fullyLoad, forcedFormat);
+    if (forcedFormat == TextureDatabaseFormat::DF_Default &&
+        gPreferredTextureDatabaseFormat != TextureDatabaseFormat::DF_Default) {
+        forcedFormat = gPreferredTextureDatabaseFormat;
+    }
+
+    Log("Loading texture database: name=%s format=%s", withName, GetTextureDatabaseFormatName(forcedFormat));
+    auto *database = CHook::CallFunction<TextureDatabaseRuntime*>(
+        g_libGTASA + (VER_x32 ? 0x001EA864 + 1 : 0x28771C),
+        withName,
+        fullyLoad,
+        forcedFormat
+    );
+    Log("Texture database result: name=%s status=%s",
+        withName,
+        database != nullptr ? "loaded" : "FAILED");
+    return database;
 }
 
 void TextureDatabaseRuntime::Register(TextureDatabaseRuntime *toRegister) {
     CHook::CallFunction<void>(g_libGTASA + (VER_x32 ? 0x1E9B48 + 1 : 0x2865D8), toRegister);
 //    if (std::find(registered.dataPtr, registered.dataPtr + registered.numEntries, toRegister) != registered.dataPtr + registered.numEntries) {
-//        return; // Уже зарегистрирован, выходим
+//        return; // пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 //    }
 //
 //    if (registered.numAlloced < registered.numEntries + 1) {

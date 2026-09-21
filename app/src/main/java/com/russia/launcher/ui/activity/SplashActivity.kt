@@ -4,6 +4,7 @@ import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.app.AlertDialog
+import android.app.ActivityManager
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -136,6 +137,10 @@ class SplashActivity : AppCompatActivity() {
     private fun initializeGpuCheck() {
         val surfaceView = GLSurfaceView(this)
         surfaceView.layoutParams = ViewGroup.LayoutParams(1, 1)
+        val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        val requestedGlVersion = activityManager.deviceConfigurationInfo.reqGlEsVersion
+        val clientVersion = if (requestedGlVersion >= 0x30000) 3 else 2
+        surfaceView.setEGLContextClientVersion(clientVersion)
         surfaceView.setRenderer(object : GLSurfaceView.Renderer {
             override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
                 if (gpuDetected) {
@@ -143,7 +148,15 @@ class SplashActivity : AppCompatActivity() {
                 }
 
                 val extensions = gl?.glGetString(GL10.GL_EXTENSIONS).orEmpty()
-                MainUtils.configureTextureSupport(extensions)
+                val version = gl?.glGetString(GL10.GL_VERSION)
+                val renderer = gl?.glGetString(GL10.GL_RENDERER)
+                MainUtils.configureTextureSupport(extensions, version, renderer)
+                Log.i(
+                    "TextureSupport",
+                    "GLES context=$clientVersion version=${version.orEmpty()} " +
+                        "renderer=${renderer.orEmpty()} selected=" +
+                        MainUtils.preferredTextureExtension
+                )
                 gpuDetected = true
 
                 runOnUiThread {

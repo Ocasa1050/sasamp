@@ -42,5 +42,10 @@ public:
 
     static RwTexture *GetTexture(const char *name);
 };
+
+void SetPreferredTextureDatabaseFormat(TextureDatabaseFormat format);
+TextureDatabaseFormat GetPreferredTextureDatabaseFormat();
+const char* GetTextureDatabaseFormatName(TextureDatabaseFormat format);
+
 VALIDATE_SIZE(TextureDatabaseRuntime, (VER_x32 ? 0xC8 : 0x118));
 VALIDATE_SIZE(TDBArray<TextureDatabaseRuntime*>, (VER_x32 ? 0xC : 0x10));

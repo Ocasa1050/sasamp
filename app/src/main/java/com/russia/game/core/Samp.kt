@@ -24,6 +24,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.russia.game.R
 import com.russia.game.gui.hud.HudManager
 import com.russia.launcher.async.task.CacheChecker.isGameCacheValid
+import com.russia.launcher.utils.MainUtils
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -37,6 +38,7 @@ class Samp : GTASA() {
     private var mDialogClientSettings: DialogClientSettings? = null
 
     private external fun initSAMP(maxFps: Float, directory: String)
+    private external fun setTextureDatabaseFormat(extension: String)
 
     override fun onCreate(bundle: Bundle?) {
 
@@ -50,16 +52,19 @@ class Samp : GTASA() {
         clearDir(internalDir)
         copyFromAssets(internalDir)
 
+        val textureExtension = MainUtils.preferredTextureExtension ?: ".dxt"
+        initializeLogFile("texture format=$textureExtension")
+        setTextureDatabaseFormat(textureExtension)
         initSAMP(maxFps, filesDir.toString())
         super.onCreate(bundle)
         init()
     }
 
-    private fun initializeLogFile() {
+    private fun initializeLogFile(message: String = "Samp.onCreate: starting native client") {
         try {
             val logFile = File(getExternalFilesDir(null), "log.txt")
             logFile.parentFile?.mkdirs()
-            logFile.appendText("Samp.onCreate: starting native client\n")
+            logFile.appendText("$message\n")
         } catch (e: Exception) {
             Log.e("Samp", "Unable to initialize log file", e)
         }

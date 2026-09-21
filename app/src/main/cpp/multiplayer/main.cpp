@@ -3,9 +3,11 @@
 #include <android/log.h>
 #include <ucontext.h>
 #include <pthread.h>
+#include <cstring>
 
 #include "main.h"
 #include "game/game.h"
+#include "game/Textures/TextureDatabaseRuntime.h"
 #include "game/RW/RenderWare.h"
 #include "net/netgame.h"
 #include "chatwindow.h"
@@ -384,8 +386,9 @@ void Log(const char *fmt, ...)
 
 	if(flLog == nullptr && g_pszStorage != nullptr)
 	{
-		sprintf(buffer, "%slog.txt", g_pszStorage);
-		flLog = fopen(buffer, "ab");
+		char logPath[1024] {};
+		snprintf(logPath, sizeof(logPath), "%slog.txt", g_pszStorage);
+		flLog = fopen(logPath, "ab");
 	}
 
 	if(flLog == nullptr) return;
@@ -414,8 +417,9 @@ void CrashLog(const char* fmt, ...)
 
 	if (flLog == nullptr && g_pszStorage != nullptr)
 	{
-		sprintf(buffer, "%scrash_log.txt", g_pszStorage);
-		flLog = fopen(buffer, "ab");
+		char logPath[1024] {};
+		snprintf(logPath, sizeof(logPath), "%scrash_log.txt", g_pszStorage);
+		flLog = fopen(logPath, "ab");
 	}
 
 	if (flLog == nullptr) return;
@@ -448,6 +452,25 @@ Java_com_russia_game_core_Samp_initSAMP(JNIEnv *env, jobject thiz, jfloat maxFps
 
 	CSettings::maxFps = (int)maxFps;
     g_pJavaWrapper = new CJavaWrapper(env, thiz);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_russia_game_core_Samp_setTextureDatabaseFormat(
+        JNIEnv *env, jobject thiz, jstring extension) {
+    const char *extensionChars = env->GetStringUTFChars(extension, nullptr);
+    TextureDatabaseFormat format = TextureDatabaseFormat::DF_DXT;
+
+    if (strcmp(extensionChars, ".etc") == 0) {
+        format = TextureDatabaseFormat::DF_ETC;
+    } else if (strcmp(extensionChars, ".pvr") == 0) {
+        format = TextureDatabaseFormat::DF_PVR;
+    }
+
+    SetPreferredTextureDatabaseFormat(format);
+    Log("Texture database JNI selection: extension=%s format=%s",
+        extensionChars, GetTextureDatabaseFormatName(format));
+    env->ReleaseStringUTFChars(extension, extensionChars);
 }
 extern bool ProcessLocalCommands(const char str[]);
 

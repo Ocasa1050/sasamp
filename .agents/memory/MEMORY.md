@@ -1,1 +1,2 @@
 - [Android build environment](android-build-environment.md) — Gradle verification needs both a Java runtime and an Android SDK configured in the workspace.
+- [Texture cache aliases](texture-cache-aliases.md) — filename aliases must declare their actual binary compression format; an extension alone is not enough.
